@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8e1f2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="肉枝管理">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>肉枝管理表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Antique&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+[hidden] { display: none !important; }
+/* Layout: 帳場の台帳。上に集計帯、入庫フォーム、検索、入庫日ごとに束ねた枝肉カードの縦リスト */
+:root {
+  --bg: #f6f3f2;
+  --surface: #ffffff;
+  --ink: #241a1a;
+  --muted: #74676a;
+  --line: #e2d9d8;
+  --accent: #8e1f2a;
+  --accent-soft: #f4e3e4;
+  --sample: #9a6a12;
+  --font-display: "Zen Antique", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161112; --surface: #211a1b; --ink: #f1e9e8; --muted: #a8999b;
+    --line: #3a2e30; --accent: #e0707a; --accent-soft: #3b2226; --sample: #d9a64a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161112; --surface: #211a1b; --ink: #f1e9e8; --muted: #a8999b;
+  --line: #3a2e30; --accent: #e0707a; --accent-soft: #3b2226; --sample: #d9a64a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; margin: 0; letter-spacing: .04em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.status { font-size: .8rem; color: var(--muted); }
+h2 { font-size: .78rem; letter-spacing: .12em; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+
+.totals { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line); }
+.totals div { padding: 10px 4px; display: grid; gap: 2px; min-width: 0; }
+.totals div + div { border-left: 1px solid var(--line); padding-left: 12px; }
+.totals small { font-size: .72rem; color: var(--muted); letter-spacing: .08em; }
+.totals b { font-family: var(--font-num); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+form { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 12px; }
+.f { display: grid; gap: 4px; min-width: 0; }
+.f label { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.f-date { grid-column: span 2; } .f-name { grid-column: span 4; }
+.f-no { grid-column: span 2; } .f-origin { grid-column: span 4; }
+.f-kg { grid-column: span 3; } .f-price { grid-column: span 3; }
+input {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 9px 10px; width: 100%; min-width: 0;
+}
+input.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kind-field { grid-column: 1 / -1; }
+.kind-label { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.preset { background: var(--bg); border: 1.5px solid var(--line); color: var(--ink); padding: 12px 6px; font-weight: 700; font-size: 1rem; letter-spacing: .04em; }
+.preset[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.form-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.preview { font-size: .85rem; color: var(--muted); }
+.preview b { font-family: var(--font-num); color: var(--ink); }
+button { font: inherit; cursor: pointer; border-radius: 6px; }
+.btn { background: var(--accent); color: #fff; border: 0; padding: 10px 22px; font-weight: 700; letter-spacing: .06em; }
+.btn:disabled { opacity: .5; cursor: default; }
+.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 6px 12px; font-size: .82rem; }
+.msg { grid-column: 1 / -1; font-size: .85rem; color: var(--accent); min-height: 1.2em; margin: 0; }
+
+.search { display: grid; gap: 10px; }
+.search input { background: var(--surface); padding: 11px 12px; font-size: 1rem; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { background: var(--surface); border: 1px solid var(--line); color: var(--ink); padding: 4px 12px; font-size: .82rem; border-radius: 999px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.group { display: grid; gap: 8px; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.group-head time { font-family: var(--font-num); font-weight: 600; font-size: .95rem; }
+.group-head span { font-size: .78rem; color: var(--muted); font-family: var(--font-num); }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+.item .top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.item .name { font-weight: 700; font-size: 1.05rem; }
+.kind { font-size: .78rem; font-weight: 700; background: var(--accent); color: #fff; padding: 1px 8px; border-radius: 4px; letter-spacing: .04em; }
+.tag { font-family: var(--font-num); font-size: .78rem; background: var(--accent-soft); color: var(--accent); padding: 1px 8px; border-radius: 4px; }
+.origin { font-size: .85rem; color: var(--muted); }
+.sample { font-size: .7rem; color: var(--sample); border: 1px solid var(--sample); border-radius: 4px; padding: 0 6px; letter-spacing: .08em; }
+.nums { grid-column: 1 / 2; display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: .9rem; }
+.nums em { font-style: normal; color: var(--muted); font-family: var(--font-body); font-size: .72rem; margin-right: 4px; }
+.nums .amt { color: var(--ink); font-weight: 600; }
+.actions { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: 6px; }
+.del { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 6px 10px; font-size: .8rem; }
+.del.confirm { background: var(--accent); border-color: var(--accent); color: #fff; }
+.empty { text-align: center; color: var(--muted); padding: 32px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.tb-btns { display: flex; gap: 6px; }
+label.ghost { cursor: pointer; border-radius: 6px; }
+.toolbar { border-top: 1px solid var(--line); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+
+@media (max-width: 520px) {
+  form { grid-template-columns: repeat(2, 1fr); }
+  .f-date, .f-name, .f-origin { grid-column: 1 / -1; }
+  .f-no { grid-column: 1 / -1; }
+  .f-kg, .f-price { grid-column: span 1; }
+  .totals b { font-size: 1.05rem; }
+  .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: no-preference) { .item { transition: border-color .15s; } .item:hover { border-color: var(--muted); } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>肉枝<span>管理表</span></h1>
+    <div class="status" id="status">読み込み中…</div>
+  </header>
+
+  <section class="totals" aria-label="表示中の集計">
+    <div><small>件数</small><b id="tCount">–</b></div>
+    <div><small>合計 kg</small><b id="tKg">–</b></div>
+    <div><small>合計金額</small><b id="tAmt">–</b></div>
+  </section>
+
+  <section class="panel">
+    <h2>入庫を登録</h2>
+    <form id="addForm" autocomplete="off">
+      <div class="f kind-field">
+        <span class="kind-label" id="kindLabel">種類</span>
+        <div class="presets" role="group" aria-labelledby="kindLabel">
+          <button type="button" class="preset" data-kind="萬野和牛">萬野和牛</button>
+          <button type="button" class="preset" data-kind="豚">豚</button>
+          <button type="button" class="preset" data-kind="ホルス">ホルス</button>
+        </div>
+      </div>
+      <div class="f f-date"><label for="fDate">入庫日</label><input id="fDate" type="date" required></div>
+      <div class="f f-name"><label for="fName">品名</label><input id="fName" list="nameList" placeholder="例：ロイン、半丸"></div>
+      <div class="f f-no"><label for="fNo">番号</label><input id="fNo" class="num" placeholder="例：1234"></div>
+      <div class="f f-origin"><label for="fOrigin">産地</label><input id="fOrigin" list="originList" placeholder="例：鹿児島県"></div>
+      <div class="f f-kg"><label for="fKg">kg</label><input id="fKg" class="num" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required></div>
+      <div class="f f-price"><label for="fPrice">単価（円/kg）</label><input id="fPrice" class="num" type="number" inputmode="numeric" step="1" min="0" placeholder="0" required></div>
+      <div class="form-foot">
+        <div class="preview">金額 <b id="pAmt">¥0</b></div>
+        <button class="btn" id="addBtn" type="submit">登録</button>
+      </div>
+      <p class="msg" id="formMsg" role="status"></p>
+    </form>
+    <datalist id="nameList"></datalist>
+    <datalist id="originList"></datalist>
+  </section>
+
+  <section class="search">
+    <input id="q" type="search" placeholder="品名・産地・番号で検索" aria-label="検索">
+    <div class="chips" id="kindChips" aria-label="種類で絞り込み"></div>
+    <div class="chips" id="chips" aria-label="産地で絞り込み"></div>
+  </section>
+
+
+  <section id="list" aria-live="polite">
+    <div class="empty">入庫データを読み込んでいます。</div>
+  </section>
+
+  <footer class="toolbar">
+    <span>データはこの端末に保存されます。機種変更の前にCSVで書き出してください。</span>
+    <span class="tb-btns">
+      <button class="ghost" id="exportCsv" type="button">CSV書き出し</button>
+      <label class="ghost" for="importCsv">CSV読み込み</label>
+      <input id="importCsv" type="file" accept=".csv,text/csv" hidden>
+    </span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const yen = (n) => "¥" + Math.round(n).toLocaleString("ja-JP");
+  const kgf = (n) => (Math.round(n * 100) / 100).toLocaleString("ja-JP", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const fmtDate = (s) => { const [y, m, d] = s.split("-"); const wd = "日月火水木金土"[new Date(+y, +m - 1, +d).getDay()]; return `${y}.${m}.${d}（${wd}）`; };
+
+  let rows = [];
+  const KEY = "nikueda.rows.v1";
+  let originFilter = "";
+  let kindFilter = "";
+  let kind = "";
+  const KINDS = ["萬野和牛", "豚", "ホルス"];
+  let pendingDel = null, pendingTimer = null;
+
+  $("fDate").value = today();
+
+  const updatePreview = () => {
+    const kg = parseFloat($("fKg").value) || 0, pr = parseFloat($("fPrice").value) || 0;
+    $("pAmt").textContent = yen(kg * pr);
+  };
+  const presets = [...document.querySelectorAll(".preset")];
+  const syncPresets = () => presets.forEach((b) => b.setAttribute("aria-pressed", String(kind === b.dataset.kind)));
+  presets.forEach((b) => b.addEventListener("click", () => { kind = b.dataset.kind; syncPresets(); $("formMsg").textContent = ""; }));
+  syncPresets();
+  $("fKg").addEventListener("input", updatePreview);
+  $("fPrice").addEventListener("input", updatePreview);
+
+  function filtered() {
+    const q = $("q").value.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (kindFilter && r.kind !== kindFilter) return false;
+      if (originFilter && r.origin !== originFilter) return false;
+      if (!q) return true;
+      return [r.kind, r.name, r.origin, r.no].some((v) => (v || "").toLowerCase().includes(q));
+    });
+  }
+
+  function render() {
+    const list = filtered();
+    const sumKg = list.reduce((a, r) => a + (r.kg || 0), 0);
+    const sumAmt = list.reduce((a, r) => a + (r.kg || 0) * (r.price || 0), 0);
+    $("tCount").textContent = list.length + " 本";
+    $("tKg").textContent = kgf(sumKg);
+    $("tAmt").textContent = yen(sumAmt);
+
+    // datalists & chips
+    const origins = [...new Set(rows.map((r) => r.origin).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+    const names = [...new Set(rows.map((r) => r.name).filter(Boolean))];
+    $("originList").replaceChildren(...origins.map((o) => Object.assign(document.createElement("option"), { value: o })));
+    $("nameList").replaceChildren(...names.map((o) => Object.assign(document.createElement("option"), { value: o })));
+    if (originFilter && !origins.includes(originFilter)) originFilter = "";
+    const chipEls = ["", ...origins].map((o) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = o || "すべての産地";
+      b.setAttribute("aria-pressed", String(o === originFilter));
+      b.onclick = () => { originFilter = o; render(); };
+      return b;
+    });
+    $("chips").replaceChildren(...(origins.length ? chipEls : []));
+    const kinds = KINDS.filter((k) => rows.some((r) => r.kind === k));
+    if (kindFilter && !kinds.includes(kindFilter)) kindFilter = "";
+    $("kindChips").replaceChildren(...(kinds.length ? ["", ...kinds].map((k) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = k || "すべての種類";
+      b.setAttribute("aria-pressed", String(k === kindFilter));
+      b.onclick = () => { kindFilter = k; render(); };
+      return b;
+    }) : []));
+
+    const box = $("list");
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty">まだ入庫がありません。上のフォームから最初の枝肉を登録してください。</div>';
+      return;
+    }
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">条件に合う枝肉はありません。</div>';
+      return;
+    }
+    const groups = new Map();
+    list.forEach((r) => { if (!groups.has(r.date)) groups.set(r.date, []); groups.get(r.date).push(r); });
+    const frag = document.createDocumentFragment();
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "grid"; wrapper.style.gap = "20px";
+    for (const [date, items] of groups) {
+      const g = document.createElement("div"); g.className = "group";
+      const gk = items.reduce((a, r) => a + r.kg, 0);
+      const head = document.createElement("div"); head.className = "group-head";
+      const t = document.createElement("time"); t.dateTime = date; t.textContent = fmtDate(date);
+      const s = document.createElement("span"); s.textContent = `${items.length}本 / ${kgf(gk)} kg`;
+      head.append(t, s); g.append(head);
+      for (const r of items) {
+        const it = document.createElement("article"); it.className = "item";
+        const top = document.createElement("div"); top.className = "top";
+        if (r.kind) { const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = r.kind; top.append(kd); }
+        const nm = document.createElement("span"); nm.className = "name"; nm.textContent = r.name || (r.kind ? "" : "（品名なし）");
+        if (nm.textContent) top.append(nm);
+        if (r.no) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = "No." + r.no; top.append(tg); }
+        if (r.origin) { const og = document.createElement("span"); og.className = "origin"; og.textContent = r.origin; top.append(og); }
+        const nums = document.createElement("div"); nums.className = "nums";
+        nums.innerHTML = `<span><em>重量</em>${kgf(r.kg)} kg</span><span><em>単価</em>${yen(r.price)}</span><span class="amt"><em>金額</em>${yen(r.kg * r.price)}</span>`;
+        const act = document.createElement("div"); act.className = "actions";
+        const del = document.createElement("button"); del.type = "button"; del.className = "del";
+        const armed = pendingDel === r.id;
+        if (armed) del.classList.add("confirm");
+        del.textContent = armed ? "本当に削除" : "削除";
+        del.setAttribute("aria-label", `${r.kind || ""} ${r.name}${r.no ? " No." + r.no : ""} を削除`);
+        del.onclick = () => onDelete(r.id);
+        act.append(del);
+        it.append(top, act, nums);
+        g.append(it);
+      }
+      wrapper.append(g);
+    }
+    frag.append(wrapper);
+    box.replaceChildren(frag);
+  }
+
+  function onDelete(id) {
+    if (pendingDel !== id) {
+      pendingDel = id; clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => { pendingDel = null; render(); }, 4000);
+      render(); return;
+    }
+    pendingDel = null; clearTimeout(pendingTimer);
+    rows = rows.filter((r) => r.id !== id);
+    save(); render();
+  }
+
+  function load() {
+    try {
+      const v = JSON.parse(localStorage.getItem(KEY) || "[]");
+      if (!Array.isArray(v)) return [];
+      // 旧形式（品名に種類が入っている）を種類と品名に分ける
+      return v.map((r) => {
+        if (r.kind !== undefined) return r;
+        const n = (r.name || "").trim();
+        const k = KINDS.find((k) => n === k || n.startsWith(k + " ") || n.startsWith(k + "　"));
+        return k ? { ...r, kind: k, name: n.slice(k.length).trim() } : { ...r, kind: "" };
+      });
+    }
+    catch (e) { return []; }
+  }
+  function sortRows() {
+    rows.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(rows)); $("status").textContent = `この端末に保存済み（${rows.length}件）`; return true; }
+    catch (e) { $("status").textContent = "保存できませんでした。ブラウザのプライベートモードを解除してください。"; return false; }
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  // CSV
+  const HEAD = ["入庫日", "種類", "品名", "番号", "産地", "kg", "単価", "金額"];
+  const esc = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  $("exportCsv").onclick = () => {
+    const lines = [HEAD.join(",")].concat(rows.map((r) => [r.date, r.kind, r.name, r.no, r.origin, r.kg, r.price, Math.round(r.kg * r.price)].map(esc).join(",")));
+    const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `肉枝管理_${today()}.csv`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  function parseCsv(text) {
+    const out = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur || row.length) { row.push(cur); out.push(row); }
+    return out.filter((r) => r.some((x) => x.trim()));
+  }
+  $("importCsv").addEventListener("change", async (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    const lines = parseCsv((await file.text()).replace(/^\ufeff/, ""));
+    let hasKind = true;
+    if (lines.length && lines[0][0] === "入庫日") { hasKind = lines[0][1] === "種類"; lines.shift(); }
+    const keyOf = (r) => [r.date, r.kind, r.name, r.no, r.origin, r.kg, r.price].join("|");
+    const have = new Set(rows.map(keyOf));
+    let added = 0;
+    for (const l of lines) {
+      const c = hasKind ? l : [l[0], "", ...l.slice(1)];
+      const r = { id: uid(), date: (c[0] || "").trim().replace(/\//g, "-"), kind: (c[1] || "").trim(), name: (c[2] || "").trim(), no: (c[3] || "").trim(), origin: (c[4] || "").trim(), kg: parseFloat(c[5]) || 0, price: parseFloat(c[6]) || 0, createdAt: Date.now() + added };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || !(r.kind || r.name) || have.has(keyOf(r))) continue;
+      rows.push(r); have.add(keyOf(r)); added++;
+    }
+    sortRows(); save(); render();
+    $("formMsg").textContent = `CSVから${added}件を読み込みました（重複は除外）。`;
+    ev.target.value = "";
+  });
+
+  $("q").addEventListener("input", render);
+
+  $("addForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = $("formMsg");
+    const kg = parseFloat($("fKg").value), price = parseFloat($("fPrice").value);
+    const data = {
+      id: uid(),
+      date: $("fDate").value,
+      kind,
+      name: $("fName").value.trim(),
+      no: $("fNo").value.trim(),
+      origin: $("fOrigin").value.trim(),
+      kg: isFinite(kg) ? kg : 0,
+      price: isFinite(price) ? price : 0,
+      createdAt: Date.now(),
+    };
+    if (!data.kind) { msg.textContent = "種類（萬野和牛・豚・ホルス）を選んでください。"; return; }
+    if (!data.date) { msg.textContent = "入庫日を入力してください。"; return; }
+    rows.push(data); sortRows();
+    if (save()) {
+      render();
+      msg.textContent = `登録しました：${data.kind}${data.name ? " " + data.name : ""}${data.no ? " No." + data.no : ""}`;
+      $("fNo").value = ""; $("fKg").value = ""; updatePreview();
+      $("fNo").focus();
+    } else {
+      rows = rows.filter((r) => r.id !== data.id);
+    }
+  });
+
+  rows = load(); sortRows();
+  $("status").textContent = `この端末に保存済み（${rows.length}件）`;
+  render();
+
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+})();
+</script>
+
+</body>
+</html>
